@@ -174,14 +174,15 @@ namespace TinyManStakingBot
             }
 
             var poolAmount = balances2.FirstOrDefault(b => b.Address == info.Asset.Params.Creator)?.Amount;
-            var sum = balances.Sum(b=>Convert.ToDecimal(b.Amount));
-
-            foreach(var b in balances)
+            var sum = balances.Sum(b => Convert.ToDecimal(b.Amount));
+            logger.Info($"Sum of {info.Asset.Params.Creator} asset {stakingAsset}: {sum}");
+            if (sum == 0) return new List<MiniAssetHolding>();
+            foreach (var b in balances)
             {
                 var newAmount = Convert.ToDecimal(poolAmount) * Convert.ToDecimal(b.Amount) / sum;
                 b.Amount = Convert.ToUInt64(Math.Round(newAmount));
             }
-
+            balances = balances.Where(b => b.Amount > 0).ToList();
             return balances;
         }
 
