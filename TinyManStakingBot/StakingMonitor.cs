@@ -40,17 +40,17 @@ namespace TinyManStakingBot
             var currentTime = (ulong)DateTimeOffset.Now.ToUnixTimeSeconds();
 
 
-            LastInterval = currentTime / configuration.Interval;
+            LastInterval = (currentTime + configuration.OffsetSec) / configuration.Interval;
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                var current = currentTime / configuration.Interval;
+                var current = (currentTime + configuration.OffsetSec) / configuration.Interval;
                 while (LastInterval >= current)
                 {
                     Console.Write(".");
                     await Task.Delay(1000, cancellationToken);
                     currentTime = (ulong)DateTimeOffset.Now.ToUnixTimeSeconds();
-                    current = currentTime / configuration.Interval;
+                    current = (currentTime + configuration.OffsetSec) / configuration.Interval;
                 }
 
                 var algoParams = await algodClient.ParamsAsync();

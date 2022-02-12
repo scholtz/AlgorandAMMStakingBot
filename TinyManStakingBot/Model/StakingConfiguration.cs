@@ -49,6 +49,10 @@ namespace TinyManStakingBot.Model
         /// </summary>
         public ulong Interval { get; set; } = 86400;
         /// <summary>
+        /// Offset in MS
+        /// </summary>
+        public ulong OffsetSec { get; set; } = 30;
+        /// <summary>
         /// List of blacklisted or excluded addresses ..
         /// </summary>
         public HashSet<string> ExcludedAccounts { get; set; } = new HashSet<string>();
