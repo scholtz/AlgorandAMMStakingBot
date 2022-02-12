@@ -143,13 +143,14 @@ namespace TinyManStakingBot
         {
             string? next = null;
             var balances = new List<MiniAssetHolding>();
+            var limit = 1000;
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-            var balance = await lookupApi.BalancesAsync(include_all: false, limit: 100, next: next, round: round, currency_greater_than: configuration.MinimumBalanceForStaking, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
+            var balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
             balances.AddRange(balance.Balances);
-            while (balance.Balances.Count > 0)
+            while (balance.Balances.Count == limit)
             {
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-                balance = await lookupApi.BalancesAsync(include_all: false, limit: 100, next: balance.NextToken, round: round, currency_greater_than: configuration.MinimumBalanceForStaking, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
+                balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
                 balances.AddRange(balance.Balances);
             }
 
@@ -159,30 +160,35 @@ namespace TinyManStakingBot
             }
             var info = AssetId2AssetInfo[poolAsset];
 
+            logger.Info($"Balances: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
             balances = balances.Where(b => b.Address != info.Asset.Params.Creator).ToList(); // without asa creator
 
 
             var balances2 = new List<MiniAssetHolding>();
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-            var balance2 = await lookupApi.BalancesAsync(include_all: false, limit: 100, next: next, round: round, currency_greater_than: configuration.MinimumBalanceForStaking, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
+            var balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
             balances2.AddRange(balance2.Balances);
-            while (balance.Balances.Count > 0)
+            while (balance2.Balances.Count == limit)
             {
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-                balance2 = await lookupApi.BalancesAsync(include_all: false, limit: 100, next: balance.NextToken, round: round, currency_greater_than: configuration.MinimumBalanceForStaking, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
+                balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
                 balances2.AddRange(balance2.Balances);
             }
 
             var poolAmount = balances2.FirstOrDefault(b => b.Address == info.Asset.Params.Creator)?.Amount;
+            if (poolAmount == null) throw new Exception($"Unable to find pool amount from {info.Asset.Params.Creator}");
             var sum = balances.Sum(b => Convert.ToDecimal(b.Amount));
             logger.Info($"Sum of {info.Asset.Params.Creator} asset {stakingAsset}: {sum}");
             if (sum == 0) return new List<MiniAssetHolding>();
             foreach (var b in balances)
             {
                 var newAmount = Convert.ToDecimal(poolAmount) * Convert.ToDecimal(b.Amount) / sum;
+                logger.Info($"B: {b.Amount} => {newAmount}");
                 b.Amount = Convert.ToUInt64(Math.Round(newAmount));
             }
             balances = balances.Where(b => b.Amount > 0).ToList();
+            logger.Info($"Balances weighted: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
+
             return balances;
         }
 
