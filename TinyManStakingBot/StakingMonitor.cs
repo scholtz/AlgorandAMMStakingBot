@@ -57,7 +57,7 @@ namespace TinyManStakingBot
                 foreach (var poolAsset in configuration.PoolAssets)
                 {
                     var rewards = await ProcessNewStakingRound(algoParams, poolAsset, configuration.AssetId);
-                    if (rewards != null)
+                    if (rewards?.Any() == true)
                     {
                         foreach (var item in rewards)
                         {
@@ -283,7 +283,7 @@ namespace TinyManStakingBot
             var interestPerInterval = Convert.ToDecimal(powered - 1);
             return interestPerInterval;
         }
-        public async Task<Dictionary<string, bool>> CheckIfAccountsAreLogicSig(IEnumerable<string> accounts)
+        public async Task<Dictionary<string, bool>> CheckIfAccountsAreLogicSig(IEnumerable<string> accounts, int attempt = 0)
         {
             var ret = new Dictionary<string, bool>();
             foreach (var account in accounts)
@@ -292,6 +292,15 @@ namespace TinyManStakingBot
                 {
                     int? limit; string? next = null; string? note_prefix = null; TxType? tx_type = null; SigType? sig_type = null; string? txid = null; ulong? round = null; ulong? min_round = null; ulong? max_round = null; int? asset_id = null; DateTimeOffset? before_time = null; DateTimeOffset? after_time = null; ulong? currency_greater_than = null; ulong? currency_less_than = null; string? address = null; AddressRole? address_role = null; bool? exclude_close_to = null; bool? rekey_to = null; int? application_id = null;
                     limit = 1;
+                    if (account == "QIEO2PIQJUKN5KYHQZAHAKMIIYZ36CZT6V3X7AVAKQZ7XCG2P6DAHIDMCU")
+                    {
+
+                    }
+                    if (attempt == 1)
+                    {
+                        // try to fetch first asa tx
+                        tx_type = TxType.Axfer;
+                    }
                     address_role = AddressRole.Sender;
                     address = account;
                     await Task.Delay(indexerConfiguration.DelayMs);
@@ -330,9 +339,25 @@ namespace TinyManStakingBot
                 }
                 catch (Exception ex)
                 {
-                    logger.Error(ex);
                     // If there is error we consider the account as logicsig
-                    ret[account] = true;
+                    if (attempt == 0)
+                    {
+                        var localRet = await CheckIfAccountsAreLogicSig(new List<string>() { account }, attempt+1);
+                        if (localRet?.ContainsKey(account) == true)
+                        {
+                            ret[account] = localRet[account];
+                        }
+                        else
+                        {
+                            ret[account] = true;
+                        }
+                    }
+                    else
+                    {
+                        ret[account] = true;
+                        logger.Error(ex);
+                    }
+
                 }
             }
             return ret;
