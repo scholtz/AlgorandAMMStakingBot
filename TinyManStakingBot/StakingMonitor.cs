@@ -52,17 +52,36 @@ namespace TinyManStakingBot
                     currentTime = (ulong)DateTimeOffset.Now.ToUnixTimeSeconds();
                     current = (currentTime + configuration.OffsetSec) / configuration.Interval;
                 }
-
+                var totalRewards = new Dictionary<string, ulong>();
                 var algoParams = await algodClient.ParamsAsync();
                 foreach (var poolAsset in configuration.PoolAssets)
                 {
-                    await ProcessNewStakingRound(algoParams, poolAsset, configuration.AssetId);
+                    var rewards = await ProcessNewStakingRound(algoParams, poolAsset, configuration.AssetId);
+                    if (rewards != null)
+                    {
+                        foreach (var item in rewards)
+                        {
+                            if (totalRewards.ContainsKey(item.Key))
+                            {
+                                totalRewards[item.Key] += item.Value;
+                            }
+                            else
+                            {
+                                totalRewards[item.Key] = item.Value;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        logger.Error($"WARNING! {poolAsset} does not have any rewards");
+                    }
                 }
+                await PayRewards(totalRewards, algoParams);
                 LastInterval = current;
             }
 
         }
-        public async Task ProcessNewStakingRound(TransactionParametersResponse algoParams, ulong poolAsset, ulong stakingAsset)
+        public async Task<Dictionary<string, ulong>?> ProcessNewStakingRound(TransactionParametersResponse algoParams, ulong poolAsset, ulong stakingAsset)
         {
             try
             {
@@ -102,13 +121,33 @@ namespace TinyManStakingBot
                 var toSendAmount = toSend.Sum(a => (long)a.Amount);
                 var rewards = CalculateAccountReward(toSend);
                 var rewardsAmount = rewards.Sum(r => Convert.ToDecimal(r.Value));
-                var keys = rewards.Keys.ToList();
 #if DEBUG
                 foreach (var r in rewards)
                 {
-                    logger.Info($"Reward:{r.Key}:{r.Value}");
+                    logger.Info($"Reward:{poolAsset}:{r.Key}:{r.Value}");
                 }
 #endif
+                return rewards;
+            }
+            catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
+            {
+                logger.Error(ex);
+                logger.Error(ex.Result.Message);
+                // If there is error we consider the account as logicsig
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex);
+            }
+            return null;
+        }
+        public async Task PayRewards(Dictionary<string, ulong> rewards, TransactionParametersResponse algoParams)
+        {
+            try
+            {
+                var toSendAmount = rewards.Sum(a => (long)a.Value);
+                var rewardsAmount = rewards.Sum(r => Convert.ToDecimal(r.Value));
+                var keys = rewards.Keys.ToList();
                 for (var page = 0; page <= keys.Count / 16; page++)
                 {
                     var pageRewards = rewards.Skip(page * 16).Take(16);
@@ -126,7 +165,6 @@ namespace TinyManStakingBot
                     logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.TxId}");
 
                 }
-
             }
             catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
             {
