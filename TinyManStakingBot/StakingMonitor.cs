@@ -147,24 +147,42 @@ namespace TinyManStakingBot
             {
                 var toSendAmount = rewards.Sum(a => (long)a.Value);
                 var rewardsAmount = rewards.Sum(r => Convert.ToDecimal(r.Value));
-                rewards = rewards.OrderByDescending(k => k.Value).ToDictionary(k=>k.Key, k=>k.Value);
+                rewards = rewards.OrderByDescending(k => k.Value).ToDictionary(k => k.Key, k => k.Value);
                 var keys = rewards.Keys.ToList();
-                for (var page = 0; page <= keys.Count / 16; page++)
+                foreach (var r in rewards)
                 {
-                    var pageRewards = rewards.Skip(page * 16).Take(16);
-
-#if DEBUG
-                    foreach (var r in pageRewards)
+                    logger.Info($"{r.Key}:{r.Value}");
+                }
+                int groubBy = 1;
+                for (var page = 0; page <= keys.Count / groubBy; page++)
+                {
+                    try
                     {
-                        logger.Info($"Page:{page}:{r.Key}:{r.Value}");
-                    }
+                        var pageRewards = rewards.Skip(page * groubBy).Take(groubBy);
+                        if (!pageRewards.Any()) continue;
+#if DEBUG
+                        foreach (var r in pageRewards)
+                        {
+                            logger.Info($"Page:{page}:{r.Key}:{r.Value}");
+                        }
 #endif
 
-                    var batch = PrepareBatch(pageRewards, algoParams);
-                    logger.Info($"{DateTimeOffset.Now} {page} ToSend: {rewards.Count()}, batch {batch.Count()} accountsBalance {toSendAmount} rewards {rewardsAmount}");
-                    var sent = await AlgoExtensions.SubmitTransactions(algodClient, batch);
-                    logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.TxId}");
 
+                        var batch = PrepareBatch(pageRewards, algoParams);
+                        logger.Info($"{DateTimeOffset.Now} {page} ToSend: {rewards.Count()}, batch {batch.Count()} accountsBalance {toSendAmount} rewards {rewardsAmount}");
+                        var sent = await AlgoExtensions.SubmitTransactions(algodClient, batch);
+                        logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.TxId}");
+                    }
+                    catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
+                    {
+                        logger.Error(ex);
+                        logger.Error(ex.Result.Message);
+                        // If there is error we consider the account as logicsig
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error(ex);
+                    }
                 }
             }
             catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
@@ -247,7 +265,10 @@ namespace TinyManStakingBot
             var signedTransactions = new List<Algorand.SignedTransaction>();
             foreach (var tx in txsToSign)
             {
-                tx.AssignGroupID(gid);
+                if (txsToSign.Count > 1)
+                {
+                    tx.AssignGroupID(gid);
+                }
                 signedTransactions.Add(dispenserAccount.SignTransaction(tx));
             }
             return signedTransactions;
@@ -343,7 +364,7 @@ namespace TinyManStakingBot
                     // If there is error we consider the account as logicsig
                     if (attempt == 0)
                     {
-                        var localRet = await CheckIfAccountsAreLogicSig(new List<string>() { account }, attempt+1);
+                        var localRet = await CheckIfAccountsAreLogicSig(new List<string>() { account }, attempt + 1);
                         if (localRet?.ContainsKey(account) == true)
                         {
                             ret[account] = localRet[account];
