@@ -147,6 +147,7 @@ namespace TinyManStakingBot
             {
                 var toSendAmount = rewards.Sum(a => (long)a.Value);
                 var rewardsAmount = rewards.Sum(r => Convert.ToDecimal(r.Value));
+                rewards = rewards.OrderByDescending(k => k.Value).ToDictionary(k=>k.Key, k=>k.Value);
                 var keys = rewards.Keys.ToList();
                 for (var page = 0; page <= keys.Count / 16; page++)
                 {
@@ -183,12 +184,12 @@ namespace TinyManStakingBot
             var balances = new List<MiniAssetHolding>();
             var limit = 1000;
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-            var balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
+            var balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
             balances.AddRange(balance.Balances);
             while (balance.Balances.Count == limit)
             {
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-                balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
+                balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
                 balances.AddRange(balance.Balances);
             }
 
@@ -204,12 +205,12 @@ namespace TinyManStakingBot
 
             var balances2 = new List<MiniAssetHolding>();
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-            var balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
+            var balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
             balances2.AddRange(balance2.Balances);
             while (balance2.Balances.Count == limit)
             {
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-                balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: round, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
+                balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
                 balances2.AddRange(balance2.Balances);
             }
 
