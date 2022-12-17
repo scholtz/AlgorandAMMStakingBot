@@ -172,6 +172,11 @@ namespace TinyManStakingBot
                         var sent = await AlgoExtensions.SubmitTransactions(algodClient, batch);
                         logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.Txid}");
                     }
+                    catch (Algorand.ApiException<Algorand.Algod.Model.ErrorResponse> ex)
+                    {
+                        logger.Error(ex.Data);
+                        logger.Error(ex);
+                    }
                     catch (Exception ex)
                     {
                         logger.Error(ex);
@@ -248,7 +253,7 @@ namespace TinyManStakingBot
 
                 var attx = new AssetTransferTransaction()
                 {
-
+                    AssetAmount = rewardItem.Value,
                     FirstValid = transParams.LastRound,
                     GenesisHash = new Algorand.Digest(transParams.GenesisHash),
                     GenesisID = transParams.GenesisId,
@@ -256,7 +261,8 @@ namespace TinyManStakingBot
                     Note = Encoding.UTF8.GetBytes("opt in transaction"),
                     XferAsset = configuration.AssetId,
                     AssetReceiver = receiverAddress,
-                    Sender = dispenserAccount.Address
+                    Sender = dispenserAccount.Address,
+                    Fee = 1000
                 };
                 txsToSign.Add(attx);
             }
