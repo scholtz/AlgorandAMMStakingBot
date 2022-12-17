@@ -34,4 +34,4 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
 
       - name: Deploy
-        run: ssh staging 'cd ~/TinyManStakingBot && ./deploy.sh'
+        run: ssh staging 'cd ~/AMMStakingBot && ./deploy.sh'

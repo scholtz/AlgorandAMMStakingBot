@@ -5,16 +5,16 @@ WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
-COPY ["TinyManStakingBot/TinyManStakingBot.csproj", "TinyManStakingBot/"]
-RUN dotnet restore "TinyManStakingBot/TinyManStakingBot.csproj"
+COPY ["AMMStakingBot/AMMStakingBot.csproj", "AMMStakingBot/"]
+RUN dotnet restore "AMMStakingBot/AMMStakingBot.csproj"
 COPY . .
-WORKDIR "/src/TinyManStakingBot"
-RUN dotnet build "TinyManStakingBot.csproj" -c Release -o /app/build
+WORKDIR "/src/AMMStakingBot"
+RUN dotnet build "AMMStakingBot.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "TinyManStakingBot.csproj" -c Release -o /app/publish
+RUN dotnet publish "AMMStakingBot.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "TinyManStakingBot.dll"]
+ENTRYPOINT ["dotnet", "AMMStakingBot.dll"]

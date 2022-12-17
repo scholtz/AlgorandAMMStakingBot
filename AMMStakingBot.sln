@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.32112.339
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AMMStakingBot", "TinyManStakingBot\AMMStakingBot.csproj", "{CA3BB9B7-551F-45D9-8A96-81EE26B95BA2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AMMStakingBot", "AMMStakingBot\AMMStakingBot.csproj", "{CA3BB9B7-551F-45D9-8A96-81EE26B95BA2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestAMMStakingBot", "TestTinyManStakingBot\TestAMMStakingBot.csproj", "{42CACE8C-0BBE-45FA-8C63-8638DF9C596B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestAMMStakingBot", "TestAMMStakingBot\TestAMMStakingBot.csproj", "{42CACE8C-0BBE-45FA-8C63-8638DF9C596B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

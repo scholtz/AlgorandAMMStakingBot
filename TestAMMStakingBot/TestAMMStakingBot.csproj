@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TinyManStakingBot\AMMStakingBot.csproj" />
+    <ProjectReference Include="..\AMMStakingBot\AMMStakingBot.csproj" />
   </ItemGroup>
 
 </Project>
