@@ -16,46 +16,29 @@ namespace TinyManStakingBot.Utils
         /// <param name="instance"></param>
         /// <param name="signedTx"></param>
         /// <returns></returns>
-        public static async Task<Algorand.V2.Algod.Model.PostTransactionsResponse> SubmitTransactions(Algorand.V2.Algod.DefaultApi instance, IEnumerable<Algorand.SignedTransaction> signedTxs) //throws Exception
+        public static async Task<Algorand.Algod.Model.PostTransactionsResponse> SubmitTransactions(Algorand.Algod.DefaultApi instance, IEnumerable<Algorand.Algod.Model.Transactions.SignedTransaction> signedTxs) //throws Exception
         {
-            List<byte> byteList = new List<byte>();
-            foreach (var signedTx in signedTxs)
-            {
-                byteList.AddRange(Algorand.Encoder.EncodeToMsgPack(signedTx));
-            }
-            using (MemoryStream ms = new MemoryStream(byteList.ToArray()))
-            {
-                return await instance.TransactionsAsync(ms);
-            }
+            return await instance.TransactionsAsync(signedTxs.ToList());
         }
-        public static Algorand.V2.Algod.DefaultApi GetAlgod(AlgodConfiguration config)
+        public static Algorand.Algod.DefaultApi GetAlgod(AlgodConfiguration config)
         {
-            var algodHttpClient = Algorand.V2.HttpClientConfigurator.ConfigureHttpClient(config.Host, config.Token, config.Header);
+            var algodHttpClient = Algorand.HttpClientConfigurator.ConfigureHttpClient(config.Host, config.Token, config.Header);
 
-            var api = new Algorand.V2.Algod.DefaultApi(algodHttpClient)
-            {
-                BaseUrl = config.Host,
-            };
+            var api = new Algorand.Algod.DefaultApi(algodHttpClient);
             return api;
         }
-        public static Algorand.V2.Indexer.SearchApi GetSearchApi(IndexerConfiguration config)
+        public static Algorand.Indexer.SearchApi GetSearchApi(IndexerConfiguration config)
         {
-            var algodHttpClient = Algorand.V2.HttpClientConfigurator.ConfigureHttpClient(config.Host, config.Token, config.Header);
+            var algodHttpClient = Algorand.HttpClientConfigurator.ConfigureHttpClient(config.Host, config.Token, config.Header);
 
-            var api = new Algorand.V2.Indexer.SearchApi(algodHttpClient)
-            {
-                BaseUrl = config.Host,
-            };
+            var api = new Algorand.Indexer.SearchApi(algodHttpClient);
             return api;
         }
-        public static Algorand.V2.Indexer.LookupApi GetLookupApi(IndexerConfiguration config)
+        public static Algorand.Indexer.LookupApi GetLookupApi(IndexerConfiguration config)
         {
-            var algodHttpClient = Algorand.V2.HttpClientConfigurator.ConfigureHttpClient(config.Host, config.Token, config.Header);
+            var algodHttpClient = Algorand.HttpClientConfigurator.ConfigureHttpClient(config.Host, config.Token, config.Header);
 
-            var api = new Algorand.V2.Indexer.LookupApi(algodHttpClient)
-            {
-                BaseUrl = config.Host,
-            };
+            var api = new Algorand.Indexer.LookupApi(algodHttpClient);
             return api;
         }
     }

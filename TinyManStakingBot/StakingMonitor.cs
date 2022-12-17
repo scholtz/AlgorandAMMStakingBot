@@ -1,5 +1,5 @@
-﻿using Algorand.V2.Algod.Model;
-using Algorand.V2.Indexer.Model;
+﻿using Algorand.Algod.Model;
+using Algorand.Indexer.Model;
 using TinyManStakingBot.Model;
 using TinyManStakingBot.Utils;
 using NLog;
@@ -9,6 +9,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Algorand;
+using Algorand.Algod.Model.Transactions;
+using static System.Net.Mime.MediaTypeNames;
+using System.Data;
 
 namespace TinyManStakingBot
 {
@@ -16,15 +20,16 @@ namespace TinyManStakingBot
     {
         protected readonly StakingConfiguration configuration;
         protected readonly IndexerConfiguration indexerConfiguration;
-        protected readonly Algorand.V2.Algod.DefaultApi algodClient;
-        protected readonly Algorand.V2.Indexer.SearchApi searchApi;
-        protected readonly Algorand.V2.Indexer.LookupApi lookupApi;
+        protected readonly Algorand.Algod.DefaultApi algodClient;
+        protected readonly Algorand.Indexer.LookupApi lookupApi;
+        protected readonly Algorand.Indexer.SearchApi searchApi;
+        protected readonly Algorand.Indexer.CommonApi commonApi;
         protected readonly CancellationToken cancellationToken;
         protected readonly Logger logger = LogManager.GetCurrentClassLogger();
         protected ulong? LastInterval = null;
         protected ConcurrentBag<string> KnownLogicSigAccounts = new ConcurrentBag<string>();
         protected ConcurrentBag<string> KnownNonLogicSigAccounts = new ConcurrentBag<string>();
-        protected ConcurrentDictionary<ulong, Response9> AssetId2AssetInfo = new ConcurrentDictionary<ulong, Response9>();
+        protected ConcurrentDictionary<ulong, AssetResponse> AssetId2AssetInfo = new ConcurrentDictionary<ulong, AssetResponse>();
 
         public StakingMonitor(Configuration configuration, CancellationToken cancellationToken)
         {
@@ -53,7 +58,7 @@ namespace TinyManStakingBot
                     current = (currentTime + configuration.OffsetSec) / configuration.Interval;
                 }
                 var totalRewards = new Dictionary<string, ulong>();
-                var algoParams = await algodClient.ParamsAsync();
+                var algoParams = await algodClient.TransactionParamsAsync();
                 foreach (var poolAsset in configuration.PoolAssets)
                 {
                     var rewards = await ProcessNewStakingRound(algoParams, poolAsset, configuration.AssetId);
@@ -99,7 +104,7 @@ namespace TinyManStakingBot
                                     .ToHashSet();
                 logger.Info($"{DateTimeOffset.Now} balances: {accounts.Count()}");
 
-                var toCheckLogSig = accounts.Where(a => !KnownNonLogicSigAccounts.Contains(a));
+                var toCheckLogSig = accounts.Where(a => !KnownNonLogicSigAccounts.Contains(a)).Select(a => new Algorand.Address(a));
                 if (toCheckLogSig.Any())
                 {
                     foreach (var item in await CheckIfAccountsAreLogicSig(toCheckLogSig))
@@ -128,12 +133,6 @@ namespace TinyManStakingBot
                 }
 #endif
                 return rewards;
-            }
-            catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
-            {
-                logger.Error(ex);
-                logger.Error(ex.Result.Message);
-                // If there is error we consider the account as logicsig
             }
             catch (Exception ex)
             {
@@ -171,25 +170,13 @@ namespace TinyManStakingBot
                         var batch = PrepareBatch(pageRewards, algoParams);
                         logger.Info($"{DateTimeOffset.Now} {page} ToSend: {rewards.Count()}, batch {batch.Count()} accountsBalance {toSendAmount} rewards {rewardsAmount}");
                         var sent = await AlgoExtensions.SubmitTransactions(algodClient, batch);
-                        logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.TxId}");
-                    }
-                    catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
-                    {
-                        logger.Error(ex);
-                        logger.Error(ex.Result.Message);
-                        // If there is error we consider the account as logicsig
+                        logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.Txid}");
                     }
                     catch (Exception ex)
                     {
                         logger.Error(ex);
                     }
                 }
-            }
-            catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
-            {
-                logger.Error(ex);
-                logger.Error(ex.Result.Message);
-                // If there is error we consider the account as logicsig
             }
             catch (Exception ex)
             {
@@ -202,33 +189,33 @@ namespace TinyManStakingBot
             var balances = new List<MiniAssetHolding>();
             var limit = 1000;
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-            var balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
+            var balance = await lookupApi.lookupAssetBalancesAsync(cancellationToken: cancellationToken, assetId: poolAsset, currencyGreaterThan: null, currencyLessThan: null, includeAll: false, limit: (ulong)limit, next: next);
             balances.AddRange(balance.Balances);
             while (balance.Balances.Count == limit)
             {
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-                balance = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)poolAsset, cancellationToken);
+                balance = balance = await lookupApi.lookupAssetBalancesAsync(cancellationToken: cancellationToken, assetId: poolAsset, currencyGreaterThan: null, currencyLessThan: null, includeAll: false, limit: (ulong)limit, next: next);
                 balances.AddRange(balance.Balances);
             }
 
             if (!AssetId2AssetInfo.ContainsKey(poolAsset))
             {
-                AssetId2AssetInfo[poolAsset] = await lookupApi.AssetsAsync((int)poolAsset, false, cancellationToken);
+                AssetId2AssetInfo[poolAsset] = await lookupApi.lookupAssetByIDAsync(cancellationToken, poolAsset, false);
             }
             var info = AssetId2AssetInfo[poolAsset];
 
             logger.Info($"Balances: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
-            balances = balances.Where(b => b.Address != info.Asset.Params.Creator).ToList(); // without asa creator
+            balances = balances.Where(b => b.Address != info.Asset.Params.Creator && b.Amount > 0).ToList(); // without asa creator
 
 
             var balances2 = new List<MiniAssetHolding>();
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-            var balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: next, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
+            var balance2 = await lookupApi.lookupAssetBalancesAsync(cancellationToken, assetId: stakingAsset, includeAll: false, limit: (ulong)limit, next: next, currencyGreaterThan: null, currencyLessThan: null);
             balances2.AddRange(balance2.Balances);
             while (balance2.Balances.Count == limit)
             {
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
-                balance2 = await lookupApi.BalancesAsync(include_all: false, limit: limit, next: balance.NextToken, round: null, currency_greater_than: null, currency_less_than: null, asset_id: (int)stakingAsset, cancellationToken);
+                balance2 = await lookupApi.lookupAssetBalancesAsync(cancellationToken, assetId: stakingAsset, includeAll: false, limit: (ulong)limit, next: next, currencyGreaterThan: null, currencyLessThan: null);
                 balances2.AddRange(balance2.Balances);
             }
 
@@ -249,27 +236,38 @@ namespace TinyManStakingBot
             return balances;
         }
 
-        public IEnumerable<Algorand.SignedTransaction> PrepareBatch(IEnumerable<KeyValuePair<string, ulong>> rewards, TransactionParametersResponse algoParams)
+        public IEnumerable<Algorand.Algod.Model.Transactions.SignedTransaction> PrepareBatch(IEnumerable<KeyValuePair<string, ulong>> rewards, TransactionParametersResponse transParams)
         {
 
-            var ret = new List<Algorand.SignedTransaction>();
-            var dispenserAccount = new Algorand.Account(configuration.DispenserMnemonic);
-            var txsToSign = new List<Algorand.Transaction>();
+            var ret = new List<Algorand.Algod.Model.Transactions.SignedTransaction>();
+            var dispenserAccount = new Algorand.Algod.Model.Account(configuration.DispenserMnemonic);
+            var txsToSign = new List<Algorand.Algod.Model.Transactions.Transaction>();
             foreach (var rewardItem in rewards)
             {
                 var receiverAddress = new Algorand.Address(rewardItem.Key);
-                txsToSign.Add(Algorand.Utils.GetTransferAssetTransaction(dispenserAccount.Address, receiverAddress, assetId: configuration.AssetId, amount: rewardItem.Value, algoParams));
+
+                var attx = new AssetTransferTransaction()
+                {
+
+                    FirstValid = transParams.LastRound,
+                    GenesisHash = new Algorand.Digest(transParams.GenesisHash),
+                    GenesisID = transParams.GenesisId,
+                    LastValid = transParams.LastRound + 1000,
+                    Note = Encoding.UTF8.GetBytes("opt in transaction"),
+                    XferAsset = configuration.AssetId,
+                    AssetReceiver = receiverAddress,
+                    Sender = dispenserAccount.Address
+                };
+                txsToSign.Add(attx);
             }
 
             Algorand.Digest gid = Algorand.TxGroup.ComputeGroupID(txsToSign.ToArray());
-            var signedTransactions = new List<Algorand.SignedTransaction>();
+            txsToSign = Algorand.TxGroup.AssignGroupID(txsToSign.ToArray()).ToList();
+            var signedTransactions = new List<Algorand.Algod.Model.Transactions.SignedTransaction>();
+
             foreach (var tx in txsToSign)
             {
-                if (txsToSign.Count > 1)
-                {
-                    tx.AssignGroupID(gid);
-                }
-                signedTransactions.Add(dispenserAccount.SignTransaction(tx));
+                signedTransactions.Add(tx.Sign(dispenserAccount));
             }
             return signedTransactions;
         }
@@ -305,78 +303,49 @@ namespace TinyManStakingBot
             var interestPerInterval = Convert.ToDecimal(powered - 1);
             return interestPerInterval;
         }
-        public async Task<Dictionary<string, bool>> CheckIfAccountsAreLogicSig(IEnumerable<string> accounts, int attempt = 0)
+        public async Task<Dictionary<string, bool>> CheckIfAccountsAreLogicSig(IEnumerable<Algorand.Address> accounts, int attempt = 0)
         {
             var ret = new Dictionary<string, bool>();
-            foreach (var account in accounts)
+            foreach (var address in accounts)
             {
+                var addressStr = address.EncodeAsString();
                 try
                 {
-                    int? limit; string? next = null; string? note_prefix = null; TxType? tx_type = null; SigType? sig_type = null; string? txid = null; ulong? round = null; ulong? min_round = null; ulong? max_round = null; int? asset_id = null; DateTimeOffset? before_time = null; DateTimeOffset? after_time = null; ulong? currency_greater_than = null; ulong? currency_less_than = null; string? address = null; AddressRole? address_role = null; bool? exclude_close_to = null; bool? rekey_to = null; int? application_id = null;
+                    ulong? limit; string? next = null;
                     limit = 1;
-                    if (account == "QIEO2PIQJUKN5KYHQZAHAKMIIYZ36CZT6V3X7AVAKQZ7XCG2P6DAHIDMCU")
-                    {
+                    var addressRole = "sender";
 
-                    }
-                    if (attempt == 1)
-                    {
-                        // try to fetch first asa tx
-                        tx_type = TxType.Axfer;
-                    }
-                    address_role = AddressRole.Sender;
-                    address = account;
                     await Task.Delay(indexerConfiguration.DelayMs);
-                    var txs = await searchApi.TransactionsAsync(limit, next, note_prefix, tx_type, sig_type, txid, round, min_round, max_round, asset_id, before_time, after_time, currency_greater_than, currency_less_than, address, address_role, exclude_close_to, rekey_to, application_id);
+                    var txs = await searchApi.searchForTransactionsAsync(address, addressRole: addressRole, limit: limit);
                     if (!txs.Transactions.Any())
                     {
-                        // we consider account with no outgoing transactions as multisig
-                        ret[account] = true;
+                        // we consider account with no outgoing transactions as logicsig
+                        ret[addressStr] = true;
                     }
                     else
                     {
                         var tx = txs.Transactions.First();
-                        ret[account] = tx.Signature.Logicsig?.Logic?.Length > 0;
+                        ret[addressStr] = tx.Signature.Logicsig?.Logic?.Length > 0;
                     }
-                }
-                catch (Algorand.V2.Algod.Model.ApiException<ErrorResponse> ex)
-                {
-                    logger.Error(ex);
-                    logger.Error(ex.Result.Message);
-                    // If there is error we consider the account as logicsig
-                    ret[account] = true;
-                }
-                catch (Algorand.V2.Indexer.Model.ApiException<ErrorResponse> ex)
-                {
-                    logger.Error(ex);
-                    logger.Error(ex.Result.Message);
-                    // If there is error we consider the account as logicsig
-                    ret[account] = true;
-                }
-                catch (Algorand.V2.Indexer.Model.ApiException<Algorand.V2.Indexer.Model.Response5> ex)
-                {
-                    logger.Error(ex);
-                    logger.Error(ex.Result.Message);
-                    // If there is error we consider the account as logicsig
-                    ret[account] = true;
                 }
                 catch (Exception ex)
                 {
                     // If there is error we consider the account as logicsig
                     if (attempt == 0)
                     {
-                        var localRet = await CheckIfAccountsAreLogicSig(new List<string>() { account }, attempt + 1);
-                        if (localRet?.ContainsKey(account) == true)
+                        var localRet = await CheckIfAccountsAreLogicSig(new List<Algorand.Address>() { address }, attempt + 1);
+                        if (localRet?.ContainsKey(addressStr) == true)
                         {
-                            ret[account] = localRet[account];
+                            ret[addressStr] = localRet[addressStr];
                         }
                         else
                         {
-                            ret[account] = true;
+                            ret[addressStr] = true;
                         }
                     }
                     else
                     {
-                        ret[account] = true;
+                        ret[addressStr] = true;
                         logger.Error(ex);
                     }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace TestTinyManStakingBot
 {
@@ -53,7 +54,7 @@ namespace TestTinyManStakingBot
                 "U7SPDFJIL3EEMPGJKNIX3Y2QBIQNMI4Y5XCMR2775P2KVID27QS6FZXIXU",
                 "IMLQ353WTB3R57H467FDATMQZBDS5LNZ7W6RBX3VR5OYLVQV2LXVTF3ZSU"
             };
-            var list = await monitor.CheckIfAccountsAreLogicSig(accounts);
+            var list = await monitor.CheckIfAccountsAreLogicSig(accounts.Select(a=>new Algorand.Address(a)));
             Assert.IsTrue(list["U7SPDFJIL3EEMPGJKNIX3Y2QBIQNMI4Y5XCMR2775P2KVID27QS6FZXIXU"]);
             Assert.IsFalse(list["IMLQ353WTB3R57H467FDATMQZBDS5LNZ7W6RBX3VR5OYLVQV2LXVTF3ZSU"]);
         }
