@@ -30,6 +30,7 @@ namespace TinyManStakingBot
         protected ConcurrentBag<string> KnownLogicSigAccounts = new ConcurrentBag<string>();
         protected ConcurrentBag<string> KnownNonLogicSigAccounts = new ConcurrentBag<string>();
         protected ConcurrentDictionary<ulong, AssetResponse> AssetId2AssetInfo = new ConcurrentDictionary<ulong, AssetResponse>();
+        private bool weightPoolBalance = true;
 
         public StakingMonitor(Configuration configuration, CancellationToken cancellationToken)
         {
@@ -39,6 +40,14 @@ namespace TinyManStakingBot
             this.searchApi = AlgoExtensions.GetSearchApi(configuration.Indexer);
             this.lookupApi = AlgoExtensions.GetLookupApi(configuration.Indexer);
             this.cancellationToken = cancellationToken;
+            if (configuration.Staking?.KnownLogicSigAccounts?.Any() == true)
+            {
+                this.KnownLogicSigAccounts = new ConcurrentBag<string>(configuration.Staking.KnownLogicSigAccounts);
+            }
+            if (configuration.Staking?.KnownNonLogicSigAccounts?.Any() == true)
+            {
+                this.KnownNonLogicSigAccounts = new ConcurrentBag<string>(configuration.Staking.KnownNonLogicSigAccounts);
+            }
         }
         public async Task Run()
         {
@@ -59,7 +68,13 @@ namespace TinyManStakingBot
                 }
                 var totalRewards = new Dictionary<string, ulong>();
                 var algoParams = await algodClient.TransactionParamsAsync();
-                foreach (var poolAsset in configuration.PoolAssets)
+                var assets = configuration.PoolAssets;
+                if (assets == null || assets.Length == 0)
+                {
+                    assets = new ulong[1] { configuration.AssetId };
+                    weightPoolBalance = false;
+                }
+                foreach (var poolAsset in assets)
                 {
                     var rewards = await ProcessNewStakingRound(algoParams, poolAsset, configuration.AssetId);
                     if (rewards?.Any() == true)
@@ -98,15 +113,18 @@ namespace TinyManStakingBot
 
                 var accounts = balances
                                     .Where(b => !b.IsFrozen)
+                                    .Where(b => b.Amount >= configuration.MinimumBalanceForStaking)
                                     .Select(b => b.Address)
                                     .Where(a => !configuration.ExcludedAccounts.Contains(a))
                                     .Where(a => !KnownLogicSigAccounts.Contains(a))
+
                                     .ToHashSet();
                 logger.Info($"{DateTimeOffset.Now} balances: {accounts.Count()}");
 
-                var toCheckLogSig = accounts.Where(a => !KnownNonLogicSigAccounts.Contains(a)).Select(a => new Algorand.Address(a));
+                var toCheckLogSig = accounts.Where(a => !KnownNonLogicSigAccounts.Contains(a)).Where(a => !KnownNonLogicSigAccounts.Contains(a)).Select(a => new Algorand.Address(a));
                 if (toCheckLogSig.Any())
                 {
+                    logger.Info($"Going to check {toCheckLogSig.Count()} for logicsig info");
                     foreach (var item in await CheckIfAccountsAreLogicSig(toCheckLogSig))
                     {
                         if (item.Value)
@@ -121,8 +139,11 @@ namespace TinyManStakingBot
                 }
 
                 var toSend = balances
+                                    .Where(b => b.Amount >= configuration.MinimumBalanceForStaking)
                                     .Where(a => !configuration.ExcludedAccounts.Contains(a.Address))
                                     .Where(a => !KnownLogicSigAccounts.Contains(a.Address));
+                //logger.Info($"KnownLogicSigAccounts: \n{string.Join("\n", KnownLogicSigAccounts.ToArray())}");
+                //logger.Info($"KnownNonLogicSigAccounts: \n{string.Join("\n", KnownNonLogicSigAccounts.ToArray())}");
                 var toSendAmount = toSend.Sum(a => (long)a.Amount);
                 var rewards = CalculateAccountReward(toSend);
                 var rewardsAmount = rewards.Sum(r => Convert.ToDecimal(r.Value));
@@ -209,9 +230,9 @@ namespace TinyManStakingBot
             }
             var info = AssetId2AssetInfo[poolAsset];
 
-            logger.Info($"Balances: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
-            balances = balances.Where(b => b.Address != info.Asset.Params.Creator && b.Amount > 0).ToList(); // without asa creator
+            balances = balances.Where(b => b.Amount > configuration.MinimumBalanceForStaking).Where(b => b.Address != info.Asset.Params.Creator && b.Amount > 0).ToList(); // without asa creator
 
+            logger.Info($"Balances: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
 
             var balances2 = new List<MiniAssetHolding>();
             await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
@@ -229,11 +250,14 @@ namespace TinyManStakingBot
             var sum = balances.Sum(b => Convert.ToDecimal(b.Amount));
             logger.Info($"Sum of {info.Asset.Params.Creator} asset {stakingAsset}: {sum}");
             if (sum == 0) return new List<MiniAssetHolding>();
-            foreach (var b in balances)
+            if (weightPoolBalance)
             {
-                var newAmount = Convert.ToDecimal(poolAmount) * Convert.ToDecimal(b.Amount) / sum;
-                logger.Info($"B: {b.Amount} => {newAmount}");
-                b.Amount = Convert.ToUInt64(Math.Round(newAmount));
+                foreach (var b in balances)
+                {
+                    var newAmount = Convert.ToDecimal(poolAmount) * Convert.ToDecimal(b.Amount) / sum;
+                    logger.Info($"B: {b.Amount} => {newAmount}");
+                    b.Amount = Convert.ToUInt64(Math.Round(newAmount));
+                }
             }
             balances = balances.Where(b => b.Amount > 0).ToList();
             logger.Info($"Balances weighted: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
@@ -327,11 +351,21 @@ namespace TinyManStakingBot
                     {
                         // we consider account with no outgoing transactions as logicsig
                         ret[addressStr] = true;
+                        logger.Info($"Account {addressStr} is not logicSig");
                     }
                     else
                     {
                         var tx = txs.Transactions.First();
-                        ret[addressStr] = tx.Signature.Logicsig?.Logic?.Length > 0;
+                        if(tx.Sender == addressStr)
+                        {
+                            ret[addressStr] = tx.Signature.Logicsig?.Logic?.Length > 0;
+                            logger.Info($"Account {addressStr} logicSig: {ret[addressStr]}");
+                        }
+                        else
+                        {
+                            ret[addressStr] = true;
+                            logger.Info($"Account {addressStr} is logicSig");
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -340,17 +374,20 @@ namespace TinyManStakingBot
                     if (attempt == 0)
                     {
                         var localRet = await CheckIfAccountsAreLogicSig(new List<Algorand.Address>() { address }, attempt + 1);
-                        if (localRet?.ContainsKey(addressStr) == true)
+                        if (localRet?.ContainsKey(addressStr) == true && localRet[addressStr])
                         {
+                            logger.Info($"Account {addressStr} is not logicSig");
                             ret[addressStr] = localRet[addressStr];
                         }
                         else
                         {
+                            logger.Info($"Account {addressStr} is logicSig");
                             ret[addressStr] = true;
                         }
                     }
                     else
                     {
+                        logger.Info($"Account {addressStr} is logicSig");
                         ret[addressStr] = true;
                         logger.Error(ex);
                     }

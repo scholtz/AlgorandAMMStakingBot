@@ -61,6 +61,13 @@ namespace TinyManStakingBot.Model
         /// Address from which is the interest dispenced
         /// </summary>
         public string DispenserMnemonic { get; set; } = "";
-
+        /// <summary>
+        /// For computational easyning we can define in the configuration the list of known logic sig accounts
+        /// </summary>
+        public HashSet<string> KnownLogicSigAccounts { get; set; } = new HashSet<string>();
+        /// <summary>
+        /// For computational easyning we can define in the configuration the list of known non logic sig accounts
+        /// </summary>
+        public HashSet<string> KnownNonLogicSigAccounts { get; set; } = new HashSet<string>();
     }
 }
