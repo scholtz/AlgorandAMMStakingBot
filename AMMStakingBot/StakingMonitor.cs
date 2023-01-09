@@ -230,7 +230,7 @@ namespace TinyManStakingBot
             }
             var info = AssetId2AssetInfo[poolAsset];
 
-            balances = balances.Where(b => b.Amount > configuration.MinimumBalanceForStaking).Where(b => b.Address != info.Asset.Params.Creator && b.Amount > 0).ToList(); // without asa creator
+            balances = balances.Where(b => b.Amount > configuration.MinimumBalanceForStaking).Where(b => b.Address != info.Asset.Params.Reserve && b.Amount > 0).ToList(); // without asa creator
 
             logger.Info($"Balances: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
 
@@ -245,10 +245,10 @@ namespace TinyManStakingBot
                 balances2.AddRange(balance2.Balances);
             }
 
-            var poolAmount = balances2.FirstOrDefault(b => b.Address == info.Asset.Params.Creator)?.Amount;
-            if (poolAmount == null) throw new Exception($"Unable to find pool amount from {info.Asset.Params.Creator}");
+            var poolAmount = balances2.FirstOrDefault(b => b.Address == info.Asset.Params.Reserve)?.Amount;
+            if (poolAmount == null) throw new Exception($"Unable to find pool amount from {info.Asset.Params.Reserve}");
             var sum = balances.Sum(b => Convert.ToDecimal(b.Amount));
-            logger.Info($"Sum of {info.Asset.Params.Creator} asset {stakingAsset}: {sum}");
+            logger.Info($"Sum of Reserve {info.Asset.Params.Reserve} asset {stakingAsset}: {sum}");
             if (sum == 0) return new List<MiniAssetHolding>();
             if (weightPoolBalance)
             {
