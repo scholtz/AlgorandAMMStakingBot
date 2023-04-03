@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AMMStakingBot.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +9,10 @@ namespace TinyManStakingBot.Model
 {
     public class StakingConfiguration
     {
+        /// <summary>
+        /// For scenarios where the app is processing different interest rates of different assets, the configuration should be done through the list of tokens
+        /// </summary>
+        public List<SingleTokenStakingConfiguration> List { get; set; } = new List<SingleTokenStakingConfiguration>();
         /// <summary>
         /// Asset Id
         /// </summary>
@@ -41,7 +46,7 @@ namespace TinyManStakingBot.Model
         /// if daily compounding is on, 10% means, that each compounding interval user gets
         /// 1.1^(1/365)= ( 1,00659120308899 - 1 ) *100 = 0,65912% balance
         /// </summary>
-        public decimal InterestRate { get; set; } = 1;
+        public decimal InterestRate { get; set; } = 0;
         /// <summary>
         /// Interval in seconds.
         /// 

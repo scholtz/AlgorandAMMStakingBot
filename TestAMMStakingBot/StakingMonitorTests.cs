@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using AMMStakingBot.Model;
 
 namespace TestTinyManStakingBot
 {
@@ -42,7 +43,11 @@ namespace TestTinyManStakingBot
         [Test]
         public void GetInterestPerIntervalTest()
         {
-            var restult = monitor.GetInterestPerInterval();
+            SingleTokenStakingConfiguration config = new SingleTokenStakingConfiguration()
+            {
+                InterestRate = 10,
+            };
+            var restult = monitor.GetInterestPerInterval(config);
             Assert.AreEqual("0.0000108802", restult.ToString("N10", CultureInfo.InvariantCulture));
         }
 
