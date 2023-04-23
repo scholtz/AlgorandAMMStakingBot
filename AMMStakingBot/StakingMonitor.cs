@@ -1,23 +1,15 @@
 ﻿using Algorand.Algod.Model;
-using Algorand.Indexer.Model;
-using TinyManStakingBot.Model;
-using TinyManStakingBot.Utils;
-using NLog;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Algorand;
 using Algorand.Algod.Model.Transactions;
-using static System.Net.Mime.MediaTypeNames;
-using System.Data;
+using Algorand.Indexer.Model;
 using AMMStakingBot.Model;
-using static Org.BouncyCastle.Math.EC.ECCurve;
+using AMMStakingBot.Utils;
 using Newtonsoft.Json;
+using NLog;
+using System.Collections.Concurrent;
+using System.Data;
+using System.Text;
 
-namespace TinyManStakingBot
+namespace AMMStakingBot
 {
     public class StakingMonitor
     {
@@ -26,16 +18,15 @@ namespace TinyManStakingBot
         protected readonly Algorand.Algod.DefaultApi algodClient;
         protected readonly Algorand.Indexer.LookupApi lookupApi;
         protected readonly Algorand.Indexer.SearchApi searchApi;
-        protected readonly Algorand.Indexer.CommonApi commonApi;
         protected readonly CancellationToken cancellationToken;
         protected readonly Logger logger = LogManager.GetCurrentClassLogger();
         protected ulong? LastInterval = null;
-        protected ConcurrentBag<string> KnownLogicSigAccounts = new ConcurrentBag<string>();
-        protected ConcurrentBag<string> KnownNonLogicSigAccounts = new ConcurrentBag<string>();
-        protected ConcurrentDictionary<ulong, AssetResponse> AssetId2AssetInfo = new ConcurrentDictionary<ulong, AssetResponse>();
+        protected ConcurrentBag<string> KnownLogicSigAccounts = new();
+        protected ConcurrentBag<string> KnownNonLogicSigAccounts = new();
+        protected ConcurrentDictionary<ulong, AssetResponse> AssetId2AssetInfo = new();
         private bool weightPoolBalance = true;
-        private readonly List<SingleTokenStakingConfiguration> stakingConfig = new List<SingleTokenStakingConfiguration>();
-        private ConcurrentDictionary<string, List<NoteItem>> Notes = new ConcurrentDictionary<string, List<NoteItem>>();
+        private readonly List<SingleTokenStakingConfiguration> stakingConfig = new();
+        private ConcurrentDictionary<string, List<NoteItem>> Notes = new();
 
         public StakingMonitor(Configuration configuration, CancellationToken cancellationToken)
         {
@@ -134,7 +125,7 @@ namespace TinyManStakingBot
             {
                 var round = algoParams.LastRound;
                 logger.Info($"{DateTimeOffset.Now} Starting dispercing round {round}");
-                var balances = await GetBalances(round, poolAsset, stakingAsset, config);
+                var balances = await GetBalances(poolAsset, stakingAsset, config);
 
                 // check all accounts if they are not log sig
 
@@ -146,7 +137,7 @@ namespace TinyManStakingBot
                                     .Where(a => !KnownLogicSigAccounts.Contains(a))
 
                                     .ToHashSet();
-                logger.Info($"{DateTimeOffset.Now} balances: {accounts.Count()}");
+                logger.Info($"{DateTimeOffset.Now} balances: {accounts.Count}");
 
                 var toCheckLogSig = accounts.Where(a => !KnownNonLogicSigAccounts.Contains(a)).Where(a => !KnownNonLogicSigAccounts.Contains(a)).Select(a => new Algorand.Address(a));
                 if (toCheckLogSig.Any())
@@ -214,7 +205,7 @@ namespace TinyManStakingBot
                         }
 #endif
                         var batch = PrepareBatch(pageRewards, algoParams);
-                        logger.Info($"{DateTimeOffset.Now} {page} ToSend: {rewards.Count()}, batch {batch.Count()} accountsBalance {toSendAmount} rewards {rewardsAmount}");
+                        logger.Info($"{DateTimeOffset.Now} {page} ToSend: {rewards.Count}, batch {batch.Count()} accountsBalance {toSendAmount} rewards {rewardsAmount}");
                         var sent = await AlgoExtensions.SubmitTransactions(algodClient, batch);
                         logger.Info($"{DateTimeOffset.Now} {page} Sent: {sent.Txid}");
                     }
@@ -243,7 +234,7 @@ namespace TinyManStakingBot
         /// <param name="config"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        protected async Task<List<MiniAssetHoldingWithAsset>> GetBalances(ulong round, ulong poolAsset, ulong stakingAsset, SingleTokenStakingConfiguration config)
+        protected async Task<List<MiniAssetHoldingWithAsset>> GetBalances(ulong poolAsset, ulong stakingAsset, SingleTokenStakingConfiguration config)
         {
             string? next = null;
             var balances = new List<MiniAssetHoldingWithAsset>();
@@ -316,7 +307,7 @@ namespace TinyManStakingBot
                 if (Notes.ContainsKey(rewardItem.Key))
                 {
                     note = "rewards/v1:j" + JsonConvert.SerializeObject(Notes[rewardItem.Key]);
-                    if (note.Length > 1000) note = note.Substring(0, 1000);
+                    if (note.Length > 1000) note = note[..1000];
                 }
                 logger.Info(note);
                 var attx = new AssetTransferTransaction()
@@ -335,7 +326,6 @@ namespace TinyManStakingBot
                 txsToSign.Add(attx);
             }
 
-            Algorand.Digest gid = Algorand.TxGroup.ComputeGroupID(txsToSign.ToArray());
             txsToSign = Algorand.TxGroup.AssignGroupID(txsToSign.ToArray()).ToList();
             var signedTransactions = new List<Algorand.Algod.Model.Transactions.SignedTransaction>();
 
@@ -409,7 +399,7 @@ namespace TinyManStakingBot
                 var addressStr = address.EncodeAsString();
                 try
                 {
-                    ulong? limit; string? next = null;
+                    ulong? limit;
                     limit = 1;
                     var addressRole = "sender";
 

@@ -1,11 +1,6 @@
-﻿using TinyManStakingBot.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using AMMStakingBot.Model;
 
-namespace TinyManStakingBot.Utils
+namespace AMMStakingBot.Utils
 {
     internal class AlgoExtensions
     {

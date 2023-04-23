@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "TinyManStakingBot": {
+    "AMMStakingBot": {
       "commandName": "Project"
     },
     "Docker": {

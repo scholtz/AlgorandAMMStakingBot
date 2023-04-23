@@ -1,11 +1,4 @@
-﻿using AMMStakingBot.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TinyManStakingBot.Model
+﻿namespace AMMStakingBot.Model
 {
     public class StakingConfiguration
     {
@@ -22,7 +15,7 @@ namespace TinyManStakingBot.Model
         /// 
         /// Eg [553838965] for Vote-ALGO pool
         /// </summary>
-        public ulong[] PoolAssets { get; set; }
+        public ulong[]? PoolAssets { get; set; }
         /// <summary>
         /// Each account with minimum balance is allowed to stake
         /// 
