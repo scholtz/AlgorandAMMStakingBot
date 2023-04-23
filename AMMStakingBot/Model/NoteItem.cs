@@ -20,5 +20,9 @@ namespace AMMStakingBot.Model
         /// Interest rate
         /// </summary>
         public decimal APY { get; set; }
+        /// <summary>
+        /// Calculated interest rate result
+        /// </summary>
+        public ulong Res { get; set; }
     }
 }

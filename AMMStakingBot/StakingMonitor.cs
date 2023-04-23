@@ -95,8 +95,13 @@ namespace TinyManStakingBot
                         assets = new ulong[1] { configuration.AssetId };
                         weightPoolBalance = false;
                     }
+                    else
+                    {
+                        weightPoolBalance = true;
+                    }
                     foreach (var poolAsset in assets)
                     {
+                        logger.Info($"Processing asset {poolAsset}");
                         var rewards = await ProcessNewStakingRound(algoParams, poolAsset, config, configuration.AssetId);
                         if (rewards?.Any() == true)
                         {
@@ -352,7 +357,18 @@ namespace TinyManStakingBot
                 {
                     effectiveBalance = config.MaximumBalanceForStaking;
                 }
-                ret[balance.Address] = Convert.ToUInt64(Math.Round(Convert.ToDecimal(effectiveBalance) * interest));
+
+                var rate = Convert.ToUInt64(Math.Round(Convert.ToDecimal(effectiveBalance) * interest));
+
+                if (ret.ContainsKey(balance.Address))
+                {
+                    ret[balance.Address] += rate;
+                }
+                else
+                {
+                    ret[balance.Address] = rate;
+                }
+
                 if (!Notes.ContainsKey(balance.Address))
                 {
                     Notes[balance.Address] = new List<NoteItem>();
@@ -362,8 +378,10 @@ namespace TinyManStakingBot
                 {
                     PoolAssetId = balance.AssetId,
                     APY = config.InterestRate,
-                    RealBalance = effectiveBalance
+                    RealBalance = effectiveBalance,
+                    Res = rate
                 });
+
             }
             return ret;
         }
