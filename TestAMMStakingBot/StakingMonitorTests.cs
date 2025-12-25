@@ -22,12 +22,12 @@ namespace TestAMMStakingBot
                 {
                     Algod = new AMMStakingBot.Model.AlgodConfiguration()
                     {
-                        Host = "https://node.testnet.algoexplorerapi.io",
+                        Host = "https://testnet-api.4160.nodely.dev",
                         Token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     },
                     Indexer = new AMMStakingBot.Model.IndexerConfiguration()
                     {
-                        Host = "https://algoindexer.testnet.algoexplorerapi.io",
+                        Host = "https://testnet-idx.4160.nodely.dev",
                         Token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     },
                     Staking = new AMMStakingBot.Model.StakingConfiguration()

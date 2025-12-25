@@ -10,7 +10,7 @@
         /// https://node.algoexplorerapi.io
         /// https://node.testnet.algoexplorerapi.io
         /// </summary>
-        public string Host { get; set; } = "https://node.testnet.algoexplorerapi.io";
+        public string Host { get; set; } = "https://mainnet-api.4160.nodely.dev";
         /// <summary>
         /// Auth header
         /// X-API-Key for purestake
@@ -20,7 +20,7 @@
         /// <summary>
         /// Auth token
         /// </summary>
-        public string Token { get; set; } = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        public string Token { get; set; } = "";
 
     }
 }

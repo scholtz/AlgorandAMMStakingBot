@@ -285,12 +285,12 @@ namespace AMMStakingBot
                 foreach (var b in balances)
                 {
                     var newAmount = Convert.ToDecimal(poolAmount) / sum * b.Amount;
-                    logger.Info($"B: {b.Amount} => {newAmount}");
+                    logger.Info($"B: {b.Address.Substring(0,6)} {b.Amount:n0} => {newAmount:n0}");
                     b.Amount = Convert.ToUInt64(Math.Round(newAmount));
                 }
             }
             balances = balances.Where(b => b.Amount > 0).ToList();
-            logger.Info($"Balances weighted: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount}"))}");
+            //logger.Info($"Balances weighted: \n{string.Join("\n", balances.Select(b => $"{b.Address}:{b.Amount:n0}"))}");
 
             return balances;
         }
@@ -371,6 +371,11 @@ namespace AMMStakingBot
                     RealBalance = effectiveBalance,
                     Res = rate
                 });
+
+                if(balance.Address == "YIAZAYLN73TRG5AKSCQR7E6JMMAMJHJJIWJEGUAJLPMRSZZVQR246Q6RPE")
+                {
+
+                }
 
             }
             return ret;
