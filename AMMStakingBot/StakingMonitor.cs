@@ -247,6 +247,7 @@ namespace AMMStakingBot
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
                 balance = balance = await lookupApi.lookupAssetBalancesAsync(cancellationToken: cancellationToken, assetId: poolAsset, currencyGreaterThan: null, currencyLessThan: null, includeAll: false, limit: (ulong)limit, next: next);
                 balances.AddRange(balance.Balances.Select(b => b.Convert2MiniAssetHoldingWithAsset(poolAsset)));
+                next = balance.NextToken;
             }
 
             if (!AssetId2AssetInfo.ContainsKey(poolAsset))
@@ -273,6 +274,7 @@ namespace AMMStakingBot
                 await Task.Delay(indexerConfiguration.DelayMs, cancellationToken);
                 balance2 = await lookupApi.lookupAssetBalancesAsync(cancellationToken, assetId: stakingAsset, includeAll: false, limit: (ulong)limit, next: next, currencyGreaterThan: null, currencyLessThan: null);
                 balances2.AddRange(balance2.Balances.Select(b => b.Convert2MiniAssetHoldingWithAsset(stakingAsset)));
+                next = balance2.NextToken;
             }
             logger.Info($"info.Asset.Params.Reserve for asset {info.Asset.Index} is {info.Asset.Params.Reserve}. Creator: {info.Asset.Params.Creator}");
             var poolAmount = balances2.FirstOrDefault(b => b.Address == reserve)?.Amount;
